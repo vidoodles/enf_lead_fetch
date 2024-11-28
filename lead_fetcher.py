@@ -82,8 +82,6 @@ class InfluencerDataFetcher:
             if bio:
                 request_body["0"]["json"]["bio"].append(bio)
 
-            print(request_body)
-
             response = requests.post(self.url, json=request_body)
             if response.status_code == 200:
                 data = response.json()
@@ -199,11 +197,10 @@ def main():
         st.title("Influencer Data Fetcher")
 
         left_value, right_value = st.slider(
-            "Follower Count", min_value=1, max_value=10, value=(1, 10)
+            "Follower Count", min_value=1, max_value=9, value=(1, 9)
         )
 
         labels = [
-            "0",
             "250",
             "500",
             "1K",
@@ -212,12 +209,14 @@ def main():
             "100k",
             "500k",
             "1M",
-            "No Limit",
+            "Infinite",
         ]
 
         follower_range = []
 
-        st.write(f"{labels[left_value - 1]} to {labels[right_value - 1]} Followers")
+        st.write(
+            f"Above {labels[left_value - 1]} to {labels[right_value - 1]} Followers"
+        )
         follower_range.append(left_value)
         follower_range.append(right_value)
         leadtype = st.selectbox("Select Lead Type:", ["CS", "MSN"])
