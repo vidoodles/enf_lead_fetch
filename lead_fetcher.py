@@ -535,7 +535,15 @@ def main():
         if st.button("Fetch Data"):
             fetcher = InfluencerDataFetcher(leadtype, country_codes, follower_range)
             keywords = keyword_input
-            st.header(f"Results for '{keywords}'")
+            active_keywords = [
+                keyword
+                for keyword in [keywords, bio_keywords, hashtag_keywords]
+                if keyword
+            ]
+
+            header_text = f"Results for {', '.join(active_keywords) if active_keywords else 'no keywords'}"
+
+            st.header(header_text)
             data = fetcher.fetch_influencer_data(
                 keywords, bio_keywords, hashtag_keywords
             )
