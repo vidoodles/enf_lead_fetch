@@ -145,7 +145,53 @@ class InfluencerDataFetcher:
         return df
 
 
+def login():
+
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    if st.session_state.logged_in:
+        st.empty()
+
+        # Show logout button
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.success("Logged out successfully!")
+            return False  # User is now logged out, return False
+
+        st.write("You are logged in!")
+        return True  # User is logged in
+
+    else:
+        title = st.empty()
+
+        username_input = st.empty()
+        password_input = st.empty()
+
+        title.title("Login to Lead Fetcher")
+        username = username_input.text_input("Username")
+        password = password_input.text_input("Password", type="password")
+
+        if st.button("Login"):
+            if (
+                username == st.secrets["enf_username"]
+                and password == st.secrets["enf_password"]
+            ):
+                st.session_state.logged_in = True
+                username_input.empty()  # Remove username input after successful login
+                password_input.empty()  # Remove password input after successful login
+                title.empty()
+                return True  # Successfully logged in
+            else:
+                st.error("Invalid username or password.")
+
+        return False  # User is not logged in
+
+
 def main():
+    if not login():
+        return
+
     st.title("Influencer Data Fetcher")
     email_text = st.empty()
     email_data = st.text_input("Check if email exist: paste email here")
