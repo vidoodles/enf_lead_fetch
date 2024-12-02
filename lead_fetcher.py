@@ -118,6 +118,7 @@ class InfluencerDataFetcher:
                                     instagramId,
                                     f"https://www.instagram.com/{instagramId}",
                                     email,
+                                    f"https://tiktok.com/@{username}",
                                     follower_count,
                                     country_name,
                                     "Not Imported",
@@ -138,7 +139,15 @@ class InfluencerDataFetcher:
                 "status",
             ]
             if self.leadtype == "CS"
-            else ["igid", "igurl", "email", "follower_count", "country", "status"]
+            else [
+                "igid",
+                "igurl",
+                "email",
+                "tiktokurl",
+                "follower_count",
+                "country",
+                "status",
+            ]
         )
         df = pd.DataFrame(data_rows, columns=columns)
         return df
