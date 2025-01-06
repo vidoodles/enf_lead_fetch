@@ -9,7 +9,7 @@ import re
 from googleapiclient.discovery import build
 
 api = Client(st.secrets["close_api_key"])
-yt_api_key = Client(st.secrets["youtube_api_key"])
+yt_api_key = st.secrets["youtube_api_key"]
 youtube = build('youtube', 'v3', developerKey=yt_api_key)
 
 
