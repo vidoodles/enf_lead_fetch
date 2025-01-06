@@ -9,8 +9,8 @@ import re
 from googleapiclient.discovery import build
 
 api = Client(st.secrets["close_api_key"])
-API_KEY = Client(st.secrets["youtube_api_key"])
-youtube = build('youtube', 'v3', developerKey=API_KEY)
+yt_api_key = Client(st.secrets["youtube_api_key"])
+youtube = build('youtube', 'v3', developerKey=yt_api_key)
 
 
 # Functions from your script
@@ -264,10 +264,10 @@ def main():
     if not login():
         return
     st.sidebar.title("Navigation")
-    options = ["Tiktok/Instagram Scraper", "Youtube Scraper", "Close Email Checker"]
+    options = ["Tiktok and Instagram Scraper", "Youtube Scraper", "Close Email Checker"]
     st.text("Use this section to check Close Data if the email already exist")
     selected_option = st.sidebar.radio("Select an Option", options)
-    if selected_option == "Influencer Data Fetcher":
+    if selected_option == "Tiktok and Instagram Scraper":
         st.title("Influencer Data Fetcher")
         st.text("Use the slider to select the follower count:")
         left_value, right_value = st.slider(
