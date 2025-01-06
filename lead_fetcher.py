@@ -5,9 +5,73 @@ from datetime import datetime
 from io import BytesIO
 from closeio_api import Client
 import pycountry
+import re
+from googleapiclient.discovery import build
 
 api = Client(st.secrets["close_api_key"])
+API_KEY = Client(st.secrets["youtube_api_key"])
+youtube = build('youtube', 'v3', developerKey=API_KEY)
 
+
+# Functions from your script
+def search_videos(query, max_results=1000):
+    videos = []
+    next_page_token = None
+
+    while len(videos) < max_results:
+        request = youtube.search().list(
+            q=query,
+            part='snippet',
+            type='video',
+            maxResults=min(max_results - len(videos), 50),
+            pageToken=next_page_token
+        )
+        response = request.execute()
+        videos.extend(response['items'])
+        next_page_token = response.get('nextPageToken')
+
+        if not next_page_token:
+            break
+
+    return videos
+
+def get_video_details(video_id):
+    request = youtube.videos().list(
+        part='snippet,statistics',
+        id=video_id
+    )
+    response = request.execute()
+    return response['items'][0]
+
+def get_channel_details(channel_id):
+    request = youtube.channels().list(
+        part='snippet,statistics,brandingSettings,contentDetails',
+        id=channel_id
+    )
+    response = request.execute()
+    return response['items'][0]
+
+def is_channel_monetized(channel_id):
+    request = youtube.channels().list(
+        part='snippet,brandingSettings',
+        id=channel_id
+    )
+    response = request.execute()
+    
+    if 'items' in response and len(response['items']) > 0:
+        channel_details = response['items'][0]
+        branding_settings = channel_details.get('brandingSettings', {})
+        channel_settings = branding_settings.get('channel', {})
+        
+        memberships_enabled = channel_settings.get('showBrowseView', False)
+        super_chat_enabled = False
+        
+        return memberships_enabled or super_chat_enabled
+    return False
+
+def extract_emails(description):
+    email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
+    return email_pattern.findall(description)
 
 def check_close_if_email_exist(email):
     lead_results = api.post(
@@ -200,7 +264,7 @@ def main():
     if not login():
         return
     st.sidebar.title("Navigation")
-    options = ["Influencer Data Fetcher", "Close Email Checker"]
+    options = ["Tiktok/Instagram Scraper", "Youtube Scraper", "Close Email Checker"]
     st.text("Use this section to check Close Data if the email already exist")
     selected_option = st.sidebar.radio("Select an Option", options)
     if selected_option == "Influencer Data Fetcher":
@@ -228,6 +292,7 @@ def main():
             f"You Selected: Above {labels[left_value - 1]} to {labels[right_value - 1]} Followers"
         )
         all_countries = [
+            "US",
             "CA",
             "GB",
             "AU",
@@ -493,10 +558,16 @@ def main():
             "ZW",
             "GH",
             "NG",
-            "PK",
             "PH",
             "KE",
             "SG",
+            "PL",
+            "MX",
+            "NL",
+            "CH",
+            "FR",
+            "SL",
+            
         ]
         follower_range.append(left_value)
         follower_range.append(right_value)
@@ -557,7 +628,7 @@ def main():
                 keywords, bio_keywords, hashtag_keywords
             )
             st.dataframe(data)
-    else:
+    elif selected_option == 'Close Email Checker':
         email_text = st.empty()
         email_data = st.text_input("Check if email exist: paste email here")
 
@@ -568,6 +639,65 @@ def main():
                 email_text.text("This email already exist in close")
             else:
                 email_text.text("Email does not exist")
+    else:
+
+        # Streamlit App
+        st.title("YouTube Video & Channel Data Extractor")
+
+        # User Input
+        search_query = st.text_input("Search Videos About:")
+        max_results = st.number_input("Max Results", min_value=1, max_value=300, value=50)
+
+        if max_results >= 300:
+            max_results = 300
+
+        if st.button("Fetch Data"):
+            if search_query:
+                try:
+                    st.info("Fetching videos... This may take some time.")
+                    videos = search_videos(search_query, max_results)
+
+                    # Store data in a DataFrame
+                    data = []
+                    for video in videos:
+                        video_id = video['id']['videoId']
+                        try:
+                            video_details = get_video_details(video_id)
+                            view_count = int(video_details['statistics'].get('viewCount', 0))
+
+                            if view_count >= 50000:
+                                channel_id = video['snippet']['channelId']
+                                channel_details = get_channel_details(channel_id)
+                                monetized = is_channel_monetized(channel_id)
+                                channel_url = f"https://www.youtube.com/channel/{channel_id}"
+                                emails = extract_emails(channel_details['snippet'].get('description', ''))
+
+                                data.append({
+                                    'Channel Name': channel_details['snippet']['title'],
+                                    'Subscribers': channel_details['statistics'].get('subscriberCount', 'N/A'),
+                                    'Channel ID': channel_id,
+                                    'Channel URL': channel_url,
+                                    'Monetized': monetized,
+                                    'Country': channel_details['snippet'].get('country', 'N/A'),
+                                    'Emails': ', '.join(emails) if emails else 'N/A'
+                                })
+                        except Exception as e:
+                            st.warning(f"Failed to get details for video {video_id}: {e}")
+
+                    # Convert data to DataFrame and display it
+                    if data:
+                        df = pd.DataFrame(data)
+                        st.write("### Extracted Data Table")
+                        st.dataframe(df)  # Display as an interactive table
+                    else:
+                        st.warning("No videos met the criteria (e.g., view count below 50,000).")
+
+                except Exception as e:
+                    st.error(f"Error: {e}")
+            else:
+                st.warning("Please enter a search query.")
+        else:
+            st.write("Enter a search term and click 'Fetch Data' to proceed.")
 
 
 footer = """<style>
