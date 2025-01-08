@@ -138,6 +138,7 @@ class InfluencerDataFetcher:
                     username = hit.get("username", "N/A")
                     email = hit.get("email", "N/A")
                     instagramId = hit.get("instagram_id", "NA")
+                    photo_url = hit.get("profile_picture", "NA")
                     follower_count = (
                         int(hit.get("follower_count", 0))
                         if hit.get("follower_count")
@@ -148,60 +149,37 @@ class InfluencerDataFetcher:
 
                     if self.leadtype == "CS":
                         if not close_email_exist and follower_count > 148000:
-                            data_rows.append(
-                                [
-                                    nickname,
-                                    f"@{username}",
-                                    f"https://tiktok.com/@{username}",
-                                    email,
-                                    follower_count,
-                                    country,
-                                    "Not Imported",
-                                    f"https://www.youtube.com/channel/{youtube_channel_id}"
-                                ]
-                            )
+                            data_rows.append({
+                                'PhotoURL': photo_url,
+                                'Name': nickname,
+                                'Username': f"@{username}",
+                                'TiktokURL': f"https://tiktok.com/@{username}",
+                                'Email': email,
+                                'Followers': follower_count,
+                                'Country': country,
+                                'Status': "Not Imported",
+                                'YoutubeURL': f"https://www.youtube.com/channel/{youtube_channel_id}"
+                            })
                     else:
                         if not close_email_exist:
-                            data_rows.append(
-                                [
-                                    nickname,
-                                    f"https://www.instagram.com/{instagramId}",
-                                    email,
-                                    f"https://tiktok.com/@{username}",
-                                    follower_count,
-                                    country_name,
-                                    "Not Imported",
-                                    f"https://www.youtube.com/channel/{youtube_channel_id}"
-                                ]
-                            )
+                            data_rows.append({
+                                'PhotoURL': photo_url,
+                                'Name': nickname,
+                                'Instagram': f"https://www.instagram.com/{instagramId}",
+                                'TiktokURL': f"https://tiktok.com/@{username}",
+                                'Email': email,
+                                'Followers': follower_count,
+                                'Country': country,
+                                'Status': "Not Imported",
+                                'YoutubeURL': f"https://www.youtube.com/channel/{youtube_channel_id}"
+                            })
+
             else:
                 print(
                     f"Failed to get data for {country_name}. Status code: {response.status_code}"
                 )
-        columns = (
-            [
-                "nickname",
-                "user",
-                "username",
-                "email",
-                "follower_count",
-                "country",
-                "status",
-                "youtube"
-            ]
-            if self.leadtype == "CS"
-            else [
-                "nickname",
-                "igurl",
-                "email",
-                "tiktokurl",
-                "follower_count",
-                "country",
-                "status",
-                "youtube"
-            ]
-        )
-        df = pd.DataFrame(data_rows, columns=columns)
+        df = pd.DataFrame(data_rows)
+
         return df
 
 
@@ -620,7 +598,38 @@ def main():
             data = fetcher.fetch_influencer_data(
                 keywords, bio_keywords, hashtag_keywords, social_platforms
             )
-            st.dataframe(data)
+            st.data_editor(
+                data,
+                column_config={
+                    "PhotoURL": st.column_config.ImageColumn(
+                        "PhotoURL", help="Streamlit app preview screenshots"
+                    ),
+                    "Name": st.column_config.TextColumn(
+                        "Name", help="Channel Name"
+                    ),
+                    "Instagram": st.column_config.TextColumn(
+                        "Instagram", help="Number of Subscribers"
+                    ),
+                    "TiktokURL": st.column_config.TextColumn(
+                        "TiktokURL", help="User URL"
+                    ),
+                    "Email": st.column_config.TextColumn(
+                        "Email", help="User email"
+                    ),
+                    "Followers": st.column_config.NumberColumn(
+                        "Followers", help="Follower Count"
+                    ),
+                    "Status": st.column_config.TextColumn(
+                        "Status", help="Follower Count"
+                    ),
+                    "YoutubeURL": st.column_config.TextColumn(
+                        "YoutubeURL", help="Follower Count"
+                    ),
+
+
+                },
+                hide_index=True,
+            )
     elif selected_option == 'Close Email Checker':
         email_text = st.empty()
         email_data = st.text_input("Check if email exist: paste email here")
