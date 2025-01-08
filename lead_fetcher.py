@@ -14,7 +14,7 @@ youtube = build('youtube', 'v3', developerKey=yt_api_key)
 
 
 # Functions from your script
-def search_videos(query, max_results=1000):
+def search_videos(query, max_results=150):
     videos = []
     next_page_token = None
 
@@ -646,7 +646,7 @@ def main():
         with col2:
             to_value = st.number_input("Subscriber Count To", min_value=0, max_value=9999999999, value=10, step=1)
 
-        max_results = st.number_input("Max Results", min_value=1, max_value=9999999999, value=50, disabled=True)
+        max_results = st.number_input("Max Results", min_value=1, max_value=150, value=1)
 
 
         if st.button("Fetch Data"):
