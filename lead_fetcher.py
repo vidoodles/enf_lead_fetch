@@ -709,7 +709,7 @@ def main():
                         )
 
                     else:
-                        st.warning("No videos met the criteria (e.g., view count below 50,000).")
+                        st.warning("No videos met the criteria or no scraped channel found")
 
                 except Exception as e:
                     st.error(f"Error: {e}")
