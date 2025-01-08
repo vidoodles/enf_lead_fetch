@@ -22,7 +22,7 @@ def search_videos(query, max_results=1000):
         request = youtube.search().list(
             q=query,
             part='snippet',
-            type='video',
+            type='channel',
             maxResults=min(max_results - len(videos), 50),
             pageToken=next_page_token
         )
@@ -45,29 +45,12 @@ def get_video_details(video_id):
 
 def get_channel_details(channel_id):
     request = youtube.channels().list(
-        part='snippet,statistics,brandingSettings,contentDetails',
+        part='snippet,statistics,contentDetails',
         id=channel_id
     )
     response = request.execute()
     return response['items'][0]
 
-def is_channel_monetized(channel_id):
-    request = youtube.channels().list(
-        part='snippet,brandingSettings',
-        id=channel_id
-    )
-    response = request.execute()
-    
-    if 'items' in response and len(response['items']) > 0:
-        channel_details = response['items'][0]
-        branding_settings = channel_details.get('brandingSettings', {})
-        channel_settings = branding_settings.get('channel', {})
-        
-        memberships_enabled = channel_settings.get('showBrowseView', False)
-        super_chat_enabled = False
-        
-        return memberships_enabled or super_chat_enabled
-    return False
 
 def extract_emails(description):
     email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
@@ -112,7 +95,7 @@ class InfluencerDataFetcher:
         except AttributeError:
             return country_code
 
-    def fetch_influencer_data(self, keyword, hashtag, bio):
+    def fetch_influencer_data(self, keyword, hashtag, bio, platforms):
         data_rows = []
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -137,8 +120,8 @@ class InfluencerDataFetcher:
                     }
                 }
             }
-            if include_socials:
-                request_body["0"]["json"]["socials"] = ["Instagram"]
+            if platforms:
+                request_body["0"]["json"]["socials"] = platforms
             if hashtag:
                 request_body["0"]["json"]["hashtags"] = [hashtag]
             if keyword:
@@ -160,6 +143,7 @@ class InfluencerDataFetcher:
                         if hit.get("follower_count")
                         else 0
                     )
+                    youtube_channel_id = hit.get("youtube_channel_id", "NA")
                     close_email_exist = check_close_if_email_exist(email)
 
                     if self.leadtype == "CS":
@@ -173,19 +157,21 @@ class InfluencerDataFetcher:
                                     follower_count,
                                     country,
                                     "Not Imported",
+                                    f"https://www.youtube.com/channel/{youtube_channel_id}"
                                 ]
                             )
                     else:
                         if not close_email_exist:
                             data_rows.append(
                                 [
-                                    instagramId,
+                                    nickname,
                                     f"https://www.instagram.com/{instagramId}",
                                     email,
                                     f"https://tiktok.com/@{username}",
                                     follower_count,
                                     country_name,
                                     "Not Imported",
+                                    f"https://www.youtube.com/channel/{youtube_channel_id}"
                                 ]
                             )
             else:
@@ -201,16 +187,18 @@ class InfluencerDataFetcher:
                 "follower_count",
                 "country",
                 "status",
+                "youtube"
             ]
             if self.leadtype == "CS"
             else [
-                "igid",
+                "nickname",
                 "igurl",
                 "email",
                 "tiktokurl",
                 "follower_count",
                 "country",
                 "status",
+                "youtube"
             ]
         )
         df = pd.DataFrame(data_rows, columns=columns)
@@ -265,7 +253,6 @@ def main():
         return
     st.sidebar.title("Navigation")
     options = ["Tiktok and Instagram Scraper", "Youtube Scraper", "Close Email Checker"]
-    st.text("Use this section to check Close Data if the email already exist")
     selected_option = st.sidebar.radio("Select an Option", options)
     if selected_option == "Tiktok and Instagram Scraper":
         st.title("Influencer Data Fetcher")
@@ -589,6 +576,12 @@ def main():
             disabled=is_disabled,
         )
         st.divider()
+        st.text("Social Platforms to check if the influencer has Youtube, or Instagram, ")
+        social_platforms = st.multiselect(
+            "Select if influencer has",
+            ["Instagram", "Youtube"]
+        )
+        st.divider()
         st.text(
             "For Advanced Search: use the inputs to filter leads by Bio, Hashtag used, and Caption keywords i suggest using 1 input at a time"
         )
@@ -625,7 +618,7 @@ def main():
 
             st.header(header_text)
             data = fetcher.fetch_influencer_data(
-                keywords, bio_keywords, hashtag_keywords
+                keywords, bio_keywords, hashtag_keywords, social_platforms
             )
             st.dataframe(data)
     elif selected_option == 'Close Email Checker':
@@ -645,50 +638,76 @@ def main():
         st.title("YouTube Video & Channel Data Extractor")
 
         # User Input
-        search_query = st.text_input("Search Videos About:")
-        max_results = st.number_input("Max Results", min_value=1, max_value=300, value=50)
+        search_query = st.text_input("Search Videos use hashtag / username / or keywords")
+        col1, col2 = st.columns([1, 1])  # Equal width columns
+        with col1:
+            from_value = st.number_input("Subscriber Count From", min_value=0, max_value=9999999999, value=0, step=1)
 
-        if max_results >= 300:
-            max_results = 300
+        with col2:
+            to_value = st.number_input("Subscriber Count To", min_value=0, max_value=9999999999, value=10, step=1)
+
+        max_results = st.number_input("Max Results", min_value=1, max_value=9999999999, value=50, disabled=True)
+
 
         if st.button("Fetch Data"):
+            added_channel_ids = set()
             if search_query:
                 try:
                     st.info("Fetching videos... This may take some time.")
-                    videos = search_videos(search_query, max_results)
+                    channels = search_videos(search_query, max_results)
 
                     # Store data in a DataFrame
                     data = []
-                    for video in videos:
-                        video_id = video['id']['videoId']
-                        try:
-                            video_details = get_video_details(video_id)
-                            view_count = int(video_details['statistics'].get('viewCount', 0))
+                    for channel in channels:
+                        channel_id = channel['snippet']['channelId']
+                        if channel_id not in added_channel_ids:
+                            channel_details = get_channel_details(channel_id)
+                            channel_url = f"https://www.youtube.com/channel/{channel_id}"
+                            emails = extract_emails(channel_details['snippet'].get('description', ''))
+                            subscribers = channel_details['statistics'].get('subscriberCount', 'N/A'),
 
-                            if view_count >= 50000:
-                                channel_id = video['snippet']['channelId']
-                                channel_details = get_channel_details(channel_id)
-                                monetized = is_channel_monetized(channel_id)
-                                channel_url = f"https://www.youtube.com/channel/{channel_id}"
-                                emails = extract_emails(channel_details['snippet'].get('description', ''))
 
+                            if from_value <= int(subscribers[0]) <= to_value:
                                 data.append({
+                                    'Thumbnail': channel['snippet']['thumbnails']['default']['url'],
                                     'Channel Name': channel_details['snippet']['title'],
                                     'Subscribers': channel_details['statistics'].get('subscriberCount', 'N/A'),
-                                    'Channel ID': channel_id,
                                     'Channel URL': channel_url,
-                                    'Monetized': monetized,
                                     'Country': channel_details['snippet'].get('country', 'N/A'),
-                                    'Emails': ', '.join(emails) if emails else 'N/A'
+                                    'Emails': ', '.join(emails) if emails else 'N/A',
                                 })
-                        except Exception as e:
-                            st.warning(f"Failed to get details for video {video_id}: {e}")
 
-                    # Convert data to DataFrame and display it
+                                added_channel_ids.add(channel_id)
+
                     if data:
                         df = pd.DataFrame(data)
                         st.write("### Extracted Data Table")
-                        st.dataframe(df)  # Display as an interactive table
+
+                        st.data_editor(
+                            df,
+                            column_config={
+                                "Thumbnail": st.column_config.ImageColumn(
+                                    "User Image", help="Streamlit app preview screenshots"
+                                ),
+                                "Channel Name": st.column_config.TextColumn(
+                                    "Channel Name", help="Channel Name"
+                                ),
+                                "Subscribers": st.column_config.TextColumn(
+                                    "Subscribers", help="Number of Subscribers"
+                                ),
+                                "Channel URL": st.column_config.TextColumn(
+                                    "Channel URL", help="User URL"
+                                ),
+                                "Country": st.column_config.TextColumn(
+                                    "Channel URL", help="User URL"
+                                ),
+                                "Emails": st.column_config.TextColumn(
+                                    "Emails", help="User URL"
+                                )
+                            },
+                            hide_index=True,
+                        )
+
                     else:
                         st.warning("No videos met the criteria (e.g., view count below 50,000).")
 
