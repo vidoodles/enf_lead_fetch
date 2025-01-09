@@ -22,7 +22,7 @@ def search_videos(query, max_results=150):
         request = youtube.search().list(
             q=query,
             part='snippet',
-            type='channel',
+            type='video',
             maxResults=min(max_results - len(videos), 50),
             pageToken=next_page_token
         )
