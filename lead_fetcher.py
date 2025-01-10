@@ -6,7 +6,7 @@ import re
 
 from datetime import datetime
 from io import BytesIO
-from countries import all_countries, english_speaking_country_codes
+from countries import all_countries, english_speaking_country_codes, spanish_speaking_countries
 from api import get_close_data
 from googleapiclient.discovery import build
 
@@ -242,15 +242,19 @@ def main():
                 "Select if influencer has", ["Instagram", "Youtube"]
             )
         st.text("Country")
-        country_col1, country_col2, country_col3 = st.columns([1, 1, 1])
+        country_col1, country_col2, country_col3, country_col4 = st.columns([1, 1, 1])
         with country_col1:
             use_english_speaking = st.checkbox("Use English-speaking countries only")
         with country_col2:
             is_filipino = st.checkbox(
                 "Filipino influencers only", disabled=use_english_speaking
             )
-        is_disabled = use_english_speaking or is_filipino
         with country_col3:
+            is_spanish = st.checkbox(
+                "Spanish influencers only", disabled=use_english_speaking
+            )
+        is_disabled = use_english_speaking or is_filipino
+        with country_col4:
             selected_options = st.multiselect(
                 "Select multiple Country by Country Code",
                 all_countries,
@@ -260,6 +264,12 @@ def main():
 
         if is_filipino:
             country_codes = filipino_country_code
+        elif is_spanish:
+            country_codes = (
+                spanish_speaking_countries
+                if is_spanish
+                else all_countries
+            )
         elif use_english_speaking:
             country_codes = (
                 english_speaking_country_codes
