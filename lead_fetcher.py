@@ -4,13 +4,15 @@ import streamlit as st
 from datetime import datetime
 from io import BytesIO
 from closeio_api import Client
+from countries import all_countries, english_speaking_country_codes
 import pycountry
 import re
 from googleapiclient.discovery import build
 
+
 api = Client(st.secrets["close_api_key"])
 yt_api_key = st.secrets["youtube_api_key"]
-youtube = build('youtube', 'v3', developerKey=yt_api_key)
+youtube = build("youtube", "v3", developerKey=yt_api_key)
 
 
 # Functions from your script
@@ -21,40 +23,39 @@ def search_videos(query, max_results=150):
     while len(videos) < max_results:
         request = youtube.search().list(
             q=query,
-            part='snippet',
-            type='video',
+            part="snippet",
+            type="video",
             maxResults=min(max_results - len(videos), 50),
-            pageToken=next_page_token
+            pageToken=next_page_token,
         )
         response = request.execute()
-        videos.extend(response['items'])
-        next_page_token = response.get('nextPageToken')
+        videos.extend(response["items"])
+        next_page_token = response.get("nextPageToken")
 
         if not next_page_token:
             break
 
     return videos
 
+
 def get_video_details(video_id):
-    request = youtube.videos().list(
-        part='snippet,statistics',
-        id=video_id
-    )
+    request = youtube.videos().list(part="snippet,statistics", id=video_id)
     response = request.execute()
-    return response['items'][0]
+    return response["items"][0]
+
 
 def get_channel_details(channel_id):
     request = youtube.channels().list(
-        part='snippet,statistics,contentDetails',
-        id=channel_id
+        part="snippet,statistics,contentDetails", id=channel_id
     )
     response = request.execute()
-    return response['items'][0]
+    return response["items"][0]
 
 
 def extract_emails(description):
-    email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
+    email_pattern = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
     return email_pattern.findall(description)
+
 
 def check_close_if_email_exist(email):
     lead_results = api.post(
@@ -149,30 +150,34 @@ class InfluencerDataFetcher:
 
                     if self.leadtype == "CS":
                         if not close_email_exist and follower_count > 148000:
-                            data_rows.append({
-                                'PhotoURL': photo_url,
-                                'Name': nickname,
-                                'Username': f"@{username}",
-                                'TiktokURL': f"https://tiktok.com/@{username}",
-                                'Email': email,
-                                'Followers': follower_count,
-                                'Country': country,
-                                'Status': "Not Imported",
-                                'YoutubeURL': f"https://www.youtube.com/channel/{youtube_channel_id}"
-                            })
+                            data_rows.append(
+                                {
+                                    "PhotoURL": photo_url,
+                                    "Name": nickname,
+                                    "Username": f"@{username}",
+                                    "TiktokURL": f"https://tiktok.com/@{username}",
+                                    "Email": email,
+                                    "Followers": follower_count,
+                                    "Country": country,
+                                    "Status": "Not Imported",
+                                    "YoutubeURL": f"https://www.youtube.com/channel/{youtube_channel_id}",
+                                }
+                            )
                     else:
                         if not close_email_exist:
-                            data_rows.append({
-                                'PhotoURL': photo_url,
-                                'Name': nickname,
-                                'Instagram': f"https://www.instagram.com/{instagramId}",
-                                'TiktokURL': f"https://tiktok.com/@{username}",
-                                'Email': email,
-                                'Followers': follower_count,
-                                'Country': country,
-                                'Status': "Not Imported",
-                                'YoutubeURL': f"https://www.youtube.com/channel/{youtube_channel_id}"
-                            })
+                            data_rows.append(
+                                {
+                                    "PhotoURL": photo_url,
+                                    "Name": nickname,
+                                    "Instagram": f"https://www.instagram.com/{instagramId}",
+                                    "TiktokURL": f"https://tiktok.com/@{username}",
+                                    "Email": email,
+                                    "Followers": follower_count,
+                                    "Country": country,
+                                    "Status": "Not Imported",
+                                    "YoutubeURL": f"https://www.youtube.com/channel/{youtube_channel_id}",
+                                }
+                            )
 
             else:
                 print(
@@ -234,7 +239,16 @@ def main():
     selected_option = st.sidebar.radio("Select an Option", options)
     if selected_option == "Tiktok and Instagram Scraper":
         st.title("Influencer Data Fetcher")
-        st.text("Use the slider to select the follower count:")
+        st.text(
+            "For Advanced Search: use the inputs to filter leads by Bio, Hashtag used, and Caption keywords i suggest using 1 input at a time"
+        )
+        search_col1, search_col2, search_col3 = st.columns([1, 1, 1])
+        with search_col1:
+            keyword_input = st.text_input("Caption Keywords: (Optional)")
+        with search_col2:
+            bio_keywords = st.text_input("Bio Keywords:  (Optional)")
+        with search_col3:
+            hashtag_keywords = st.text_input("Hashtag Keywords:  (Optional)")
         left_value, right_value = st.slider(
             "Follower Count", min_value=1, max_value=9, value=(1, 9)
         )
@@ -256,318 +270,31 @@ def main():
         st.write(
             f"You Selected: Above {labels[left_value - 1]} to {labels[right_value - 1]} Followers"
         )
-        all_countries = [
-            "US",
-            "CA",
-            "GB",
-            "AU",
-            "KW",
-            "AT",
-            "YT",
-            "TN",
-            "JP",
-            "GY",
-            "SH",
-            "MF",
-            "GT",
-            "VE",
-            "TF",
-            "CV",
-            "AZ",
-            "GG",
-            "KE",
-            "SS",
-            "MM",
-            "LI",
-            "MQ",
-            "CR",
-            "PS",
-            "ES",
-            "GW",
-            "AX",
-            "SL",
-            "PH",
-            "TG",
-            "RU",
-            "HT",
-            "KR",
-            "WS",
-            "AW",
-            "AF",
-            "BV",
-            "BS",
-            "GE",
-            "KY",
-            "MK",
-            "SY",
-            "HK",
-            "CL",
-            "ZW",
-            "BQ",
-            "NL",
-            "GQ",
-            "SZ",
-            "OM",
-            "HM",
-            "RO",
-            "ZA",
-            "MZ",
-            "TT",
-            "BH",
-            "CG",
-            "LB",
-            "RE",
-            "EE",
-            "BD",
-            "ET",
-            "PE",
-            "GS",
-            "EC",
-            "VA",
-            "MU",
-            "AS",
-            "PM",
-            "CU",
-            "IO",
-            "VN",
-            "BJ",
-            "GR",
-            "GD",
-            "BZ",
-            "CN",
-            "ME",
-            "TH",
-            "GU",
-            "KM",
-            "LA",
-            "ML",
-            "DE",
-            "SR",
-            "GM",
-            "MV",
-            "TO",
-            "AG",
-            "GN",
-            "CW",
-            "PA",
-            "PG",
-            "NC",
-            "HR",
-            "PW",
-            "VI",
-            "KH",
-            "PR",
-            "PF",
-            "NI",
-            "CO",
-            "MR",
-            "BW",
-            "FJ",
-            "LV",
-            "SJ",
-            "BM",
-            "UG",
-            "BA",
-            "GA",
-            "TD",
-            "CC",
-            "KZ",
-            "PN",
-            "GP",
-            "SD",
-            "DM",
-            "QA",
-            "BB",
-            "TR",
-            "DK",
-            "MH",
-            "YE",
-            "AQ",
-            "ST",
-            "TM",
-            "KP",
-            "PT",
-            "ER",
-            "GI",
-            "MN",
-            "XK",
-            "AI",
-            "MW",
-            "TV",
-            "MD",
-            "BN",
-            "UM",
-            "FI",
-            "GH",
-            "DO",
-            "MP",
-            "CZ",
-            "MA",
-            "HN",
-            "IL",
-            "MG",
-            "LU",
-            "AM",
-            "TC",
-            "FK",
-            "AO",
-            "CY",
-            "ID",
-            "UZ",
-            "BI",
-            "AL",
-            "BL",
-            "BO",
-            "KG",
-            "AE",
-            "PY",
-            "TZ",
-            "AR",
-            "PK",
-            "NP",
-            "NZ",
-            "CH",
-            "NF",
-            "SE",
-            "LC",
-            "UY",
-            "MX",
-            "SO",
-            "MS",
-            "NO",
-            "SC",
-            "NR",
-            "BT",
-            "RW",
-            "HU",
-            "SI",
-            "SX",
-            "IN",
-            "GF",
-            "IT",
-            "SG",
-            "IE",
-            "AD",
-            "IS",
-            "FM",
-            "FO",
-            "KN",
-            "NE",
-            "FR",
-            "DJ",
-            "LR",
-            "TW",
-            "JO",
-            "GL",
-            "LY",
-            "KI",
-            "CK",
-            "LS",
-            "MC",
-            "MY",
-            "WF",
-            "SA",
-            "BG",
-            "BF",
-            "BR",
-            "LT",
-            "JE",
-            "DZ",
-            "SB",
-            "LK",
-            "SM",
-            "NG",
-            "SK",
-            "CM",
-            "NA",
-            "EG",
-            "VC",
-            "BY",
-            "UA",
-            "CX",
-            "NU",
-            "JM",
-            "ZM",
-            "SN",
-            "BE",
-            "CF",
-            "IR",
-            "IQ",
-            "TL",
-            "IM",
-            "MO",
-            "SV",
-            "MT",
-            "PL",
-            "RS",
-            "CI",
-            "EH",
-            "CD",
-            "TJ",
-            "VU",
-            "TK",
-            "VG",
-        ]  # Add all countries as needed
-        english_speaking_country_codes = [
-            "US",
-            "GB",
-            "CA",
-            "AU",
-            "NZ",
-            "IE",
-            "JM",
-            "TT",
-            "BB",
-            "BS",
-            "BZ",
-            "ZW",
-            "GH",
-            "NG",
-            "PH",
-            "KE",
-            "SG",
-            "PL",
-            "MX",
-            "NL",
-            "CH",
-            "FR",
-            "SL",
-            
-        ]
         follower_range.append(left_value)
         follower_range.append(right_value)
-
-        leadtype = st.selectbox("Select Lead Type:", ["CS", "MSN"])
-        st.divider()
-        st.text(
-            "Country Selection: Use either english speaking countries, PH, or Select multiple from the dropdown below. I Suggest using the English speaking countries if you selected MSN above"
-        )
-        use_english_speaking = st.checkbox("Use English-speaking countries only")
-        is_filipino = st.checkbox(
-            "Filipino influencers only", disabled=use_english_speaking
-        )
+        lead_type_col1, lead_type_col2 = st.columns([1, 1])
+        with lead_type_col1:
+            leadtype = st.selectbox("Select Lead Type:", ["CS", "MSN"])
+        with lead_type_col2:
+            social_platforms = st.multiselect(
+                "Select if influencer has", ["Instagram", "Youtube"]
+            )
+        st.text("Country")
+        country_col1, country_col2, country_col3 = st.columns([1, 1, 1])
+        with country_col1:
+            use_english_speaking = st.checkbox("Use English-speaking countries only")
+        with country_col2:
+            is_filipino = st.checkbox(
+                "Filipino influencers only", disabled=use_english_speaking
+            )
         is_disabled = use_english_speaking or is_filipino
-        st.text("Or Select from here")
-        selected_options = st.multiselect(
-            "Select multiple Country by Country Code",
-            all_countries,
-            disabled=is_disabled,
-        )
-        st.divider()
-        st.text("Social Platforms to check if the influencer has Youtube, or Instagram, ")
-        social_platforms = st.multiselect(
-            "Select if influencer has",
-            ["Instagram", "Youtube"]
-        )
-        st.divider()
-        st.text(
-            "For Advanced Search: use the inputs to filter leads by Bio, Hashtag used, and Caption keywords i suggest using 1 input at a time"
-        )
-        keyword_input = st.text_input("Caption Keywords: (Optional)")
-        bio_keywords = st.text_input("Bio Keywords:  (Optional)")
-        hashtag_keywords = st.text_input("Hashtag Keywords:  (Optional)")
-
-        filipino_country_code = ["PH"]
+        with country_col3:
+            selected_options = st.multiselect(
+                "Select multiple Country by Country Code",
+                all_countries,
+                disabled=is_disabled,
+            )
+        filipino_country_code = [code for code in all_countries if code == "PH"]
 
         if is_filipino:
             country_codes = filipino_country_code
@@ -583,7 +310,7 @@ def main():
         else:
             country_codes = all_countries
 
-        if st.button("Fetch Data"):
+        if st.button("Fetch Data", type="primary", use_container_width=True):
             fetcher = InfluencerDataFetcher(leadtype, country_codes, follower_range)
             keywords = keyword_input
             active_keywords = [
@@ -604,18 +331,14 @@ def main():
                     "PhotoURL": st.column_config.ImageColumn(
                         "PhotoURL", help="Streamlit app preview screenshots"
                     ),
-                    "Name": st.column_config.TextColumn(
-                        "Name", help="Channel Name"
-                    ),
+                    "Name": st.column_config.TextColumn("Name", help="Channel Name"),
                     "Instagram": st.column_config.TextColumn(
                         "Instagram", help="Number of Subscribers"
                     ),
                     "TiktokURL": st.column_config.TextColumn(
                         "TiktokURL", help="User URL"
                     ),
-                    "Email": st.column_config.TextColumn(
-                        "Email", help="User email"
-                    ),
+                    "Email": st.column_config.TextColumn("Email", help="User email"),
                     "Followers": st.column_config.NumberColumn(
                         "Followers", help="Follower Count"
                     ),
@@ -625,12 +348,10 @@ def main():
                     "YoutubeURL": st.column_config.TextColumn(
                         "YoutubeURL", help="Follower Count"
                     ),
-
-
                 },
                 hide_index=True,
             )
-    elif selected_option == 'Close Email Checker':
+    elif selected_option == "Close Email Checker":
         email_text = st.empty()
         email_data = st.text_input("Check if email exist: paste email here")
 
@@ -647,18 +368,33 @@ def main():
         st.title("YouTube Video & Channel Data Extractor")
 
         # User Input
-        search_query = st.text_input("Search Videos use hashtag / username / or keywords")
+        search_query = st.text_input(
+            "Search Videos use hashtag / username / or keywords"
+        )
         col1, col2 = st.columns([1, 1])  # Equal width columns
         with col1:
-            from_value = st.number_input("Subscriber Count From", min_value=0, max_value=9999999999, value=0, step=1)
+            from_value = st.number_input(
+                "Subscriber Count From",
+                min_value=0,
+                max_value=9999999999,
+                value=0,
+                step=1,
+            )
 
         with col2:
-            to_value = st.number_input("Subscriber Count To", min_value=0, max_value=9999999999, value=10, step=1)
+            to_value = st.number_input(
+                "Subscriber Count To",
+                min_value=0,
+                max_value=9999999999,
+                value=10,
+                step=1,
+            )
 
-        max_results = st.number_input("Max Results", min_value=1, max_value=150, value=1)
+        max_results = st.number_input(
+            "Max Results", min_value=1, max_value=150, value=1
+        )
 
-
-        if st.button("Fetch Data"):
+        if st.button("Fetch Data", type="primary", use_container_width=True):
             added_channel_ids = set()
             if search_query:
                 try:
@@ -668,23 +404,42 @@ def main():
                     # Store data in a DataFrame
                     data = []
                     for channel in channels:
-                        channel_id = channel['snippet']['channelId']
+                        channel_id = channel["snippet"]["channelId"]
                         if channel_id not in added_channel_ids:
                             channel_details = get_channel_details(channel_id)
-                            channel_url = f"https://www.youtube.com/channel/{channel_id}"
-                            emails = extract_emails(channel_details['snippet'].get('description', ''))
-                            subscribers = channel_details['statistics'].get('subscriberCount', 'N/A'),
-
+                            channel_url = (
+                                f"https://www.youtube.com/channel/{channel_id}"
+                            )
+                            emails = extract_emails(
+                                channel_details["snippet"].get("description", "")
+                            )
+                            subscribers = (
+                                channel_details["statistics"].get(
+                                    "subscriberCount", "N/A"
+                                ),
+                            )
 
                             if from_value <= int(subscribers[0]) <= to_value:
-                                data.append({
-                                    'Thumbnail': channel['snippet']['thumbnails']['default']['url'],
-                                    'Channel Name': channel_details['snippet']['title'],
-                                    'Subscribers': channel_details['statistics'].get('subscriberCount', 'N/A'),
-                                    'Channel URL': channel_url,
-                                    'Country': channel_details['snippet'].get('country', 'N/A'),
-                                    'Emails': ', '.join(emails) if emails else 'N/A',
-                                })
+                                data.append(
+                                    {
+                                        "Thumbnail": channel["snippet"]["thumbnails"][
+                                            "default"
+                                        ]["url"],
+                                        "Channel Name": channel_details["snippet"][
+                                            "title"
+                                        ],
+                                        "Subscribers": channel_details[
+                                            "statistics"
+                                        ].get("subscriberCount", "N/A"),
+                                        "Channel URL": channel_url,
+                                        "Country": channel_details["snippet"].get(
+                                            "country", "N/A"
+                                        ),
+                                        "Emails": (
+                                            ", ".join(emails) if emails else "N/A"
+                                        ),
+                                    }
+                                )
 
                                 added_channel_ids.add(channel_id)
 
@@ -696,7 +451,8 @@ def main():
                             df,
                             column_config={
                                 "Thumbnail": st.column_config.ImageColumn(
-                                    "User Image", help="Streamlit app preview screenshots"
+                                    "User Image",
+                                    help="Streamlit app preview screenshots",
                                 ),
                                 "Channel Name": st.column_config.TextColumn(
                                     "Channel Name", help="Channel Name"
@@ -712,13 +468,15 @@ def main():
                                 ),
                                 "Emails": st.column_config.TextColumn(
                                     "Emails", help="User URL"
-                                )
+                                ),
                             },
                             hide_index=True,
                         )
 
                     else:
-                        st.warning("No videos met the criteria or no scraped channel found")
+                        st.warning(
+                            "No videos met the criteria or no scraped channel found"
+                        )
 
                 except Exception as e:
                     st.error(f"Error: {e}")

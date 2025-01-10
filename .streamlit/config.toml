@@ -1,2 +1,4 @@
 [theme]
-font="monospace"
+base="light"
+primaryColor="#2171bb"
+font="serif"
