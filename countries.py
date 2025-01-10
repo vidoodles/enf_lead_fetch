@@ -276,3 +276,26 @@ english_speaking_country_codes = [
     "FR",
     "SL",
 ]
+
+spanish_speaking_countries = [
+  "MX",
+  "CO",
+  "ES",
+  "AR",
+  "PE",
+  "VE",
+  "CL",
+  "GT",
+  "EC",
+  "BO",
+  "CU",
+  "DO",
+  "HN",
+  "PY",
+  "SV",
+  "NI",
+  "CR",
+  "PA",
+  "UY",
+  "GQ"
+]
