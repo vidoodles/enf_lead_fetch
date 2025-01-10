@@ -127,11 +127,12 @@ def get_close_data(email, days_back=None):
     
     else:
         lead_id = lead_results["data"][0]["id"]
+        date_last_email = get_latest_email(lead_id)
         if days_back is not None:
-            date_last_email = get_latest_email(lead_id)
             if date_last_email:
                 return f"Contacted Date: {date_last_email}"
             else:
                 return f"{email} Contacted but older than {days_back} days"
         else:
-            return f"{email} Contacted but no specific days_back check applied"
+             return f"Contacted Date: {date_last_email}"
+            
