@@ -242,7 +242,7 @@ def main():
                 "Select if influencer has", ["Instagram", "Youtube"]
             )
         st.text("Country")
-        country_col1, country_col2, country_col3, country_col4 = st.columns([1, 1, 1])
+        country_col1, country_col2, country_col3, country_col4 = st.columns([1, 1, 1, 1])
         with country_col1:
             use_english_speaking = st.checkbox("Use English-speaking countries only")
         with country_col2:
