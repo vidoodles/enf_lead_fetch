@@ -1,20 +1,19 @@
 import requests
 import pandas as pd
 import streamlit as st
-from datetime import datetime
-from io import BytesIO
-from closeio_api import Client
-from countries import all_countries, english_speaking_country_codes
 import pycountry
 import re
+
+from datetime import datetime
+from io import BytesIO
+from countries import all_countries, english_speaking_country_codes
+from api import get_close_data
 from googleapiclient.discovery import build
 
-
-api = Client(st.secrets["close_api_key"])
 yt_api_key = st.secrets["youtube_api_key"]
 youtube = build("youtube", "v3", developerKey=yt_api_key)
 
-
+st.set_page_config(layout="wide", menu_items={"Get help": None, "Report a bug": None})
 # Functions from your script
 def search_videos(query, max_results=150):
     videos = []
@@ -57,30 +56,6 @@ def extract_emails(description):
     return email_pattern.findall(description)
 
 
-def check_close_if_email_exist(email):
-    lead_results = api.post(
-        "data/search/",
-        data={
-            "query": {
-                "negate": False,
-                "queries": [
-                    {"negate": False, "object_type": "lead", "type": "object_type"},
-                    {
-                        "mode": "beginning_of_words",
-                        "negate": False,
-                        "type": "text",
-                        "value": email,
-                    },
-                    {"negate": False, "queries": [], "type": "and"},
-                ],
-                "type": "and",
-            },
-            "results_limit": None,
-            "sort": [],
-        },
-    )
-    return len(lead_results["data"]) >= 1
-
 
 class InfluencerDataFetcher:
     def __init__(self, leadtype, country_codes, follower_range):
@@ -96,7 +71,7 @@ class InfluencerDataFetcher:
         except AttributeError:
             return country_code
 
-    def fetch_influencer_data(self, keyword, hashtag, bio, platforms):
+    def fetch_influencer_data(self, keyword, hashtag, bio, platforms, days_since_reference_given):
         data_rows = []
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -146,43 +121,20 @@ class InfluencerDataFetcher:
                         else 0
                     )
                     youtube_channel_id = hit.get("youtube_channel_id", "NA")
-                    close_email_exist = check_close_if_email_exist(email)
-
-                    if self.leadtype == "CS":
-                        if not close_email_exist and follower_count > 148000:
-                            data_rows.append(
-                                {
-                                    "PhotoURL": photo_url,
-                                    "Name": nickname,
-                                    "Username": f"@{username}",
-                                    "TiktokURL": f"https://tiktok.com/@{username}",
-                                    "Email": email,
-                                    "Followers": follower_count,
-                                    "Country": country,
-                                    "Status": "Not Imported",
-                                    "YoutubeURL": f"https://www.youtube.com/channel/{youtube_channel_id}",
-                                }
-                            )
-                    else:
-                        if not close_email_exist:
-                            data_rows.append(
-                                {
-                                    "PhotoURL": photo_url,
-                                    "Name": nickname,
-                                    "Instagram": f"https://www.instagram.com/{instagramId}",
-                                    "TiktokURL": f"https://tiktok.com/@{username}",
-                                    "Email": email,
-                                    "Followers": follower_count,
-                                    "Country": country,
-                                    "Status": "Not Imported",
-                                    "YoutubeURL": f"https://www.youtube.com/channel/{youtube_channel_id}",
-                                }
-                            )
-
-            else:
-                print(
-                    f"Failed to get data for {country_name}. Status code: {response.status_code}"
-                )
+                    close_email_exist = get_close_data(email, days_since_reference_given)
+                    data_rows.append(
+                        {
+                            "PhotoURL": photo_url,
+                            "Name": nickname,
+                            "Instagram": f"https://www.instagram.com/{instagramId}",
+                            "TiktokURL": f"https://tiktok.com/@{username}",
+                            "Email": email,
+                            "Followers": follower_count,
+                            "Country": country,
+                            "Status": close_email_exist if close_email_exist else "Not Contacted",
+                            "YoutubeURL": f"https://www.youtube.com/channel/{youtube_channel_id}",
+                        }
+                    )
         df = pd.DataFrame(data_rows)
 
         return df
@@ -201,8 +153,6 @@ def login():
             st.session_state.logged_in = False
             st.success("Logged out successfully!")
             return False  # User is now logged out, return False
-
-        st.write("You are logged in!")
         return True  # User is logged in
 
     else:
@@ -249,27 +199,39 @@ def main():
             bio_keywords = st.text_input("Bio Keywords:  (Optional)")
         with search_col3:
             hashtag_keywords = st.text_input("Hashtag Keywords:  (Optional)")
-        left_value, right_value = st.slider(
-            "Follower Count", min_value=1, max_value=9, value=(1, 9)
-        )
-
-        labels = [
-            "250",
-            "500",
-            "1K",
-            "10k",
-            "50k",
-            "100k",
-            "500k",
-            "1M",
-            "Infinite",
-        ]
+        
+        search_col4, search_col5 = st.columns([1, 1])
+        with search_col4:
+            left_value, right_value = st.slider(
+                "Follower Count", min_value=1, max_value=9, value=(1, 9)
+            )
+            labels = [
+                "250",
+                "500",
+                "1K",
+                "10k",
+                "50k",
+                "100k",
+                "500k",
+                "1M",
+                "Infinite",
+            ]
+            st.write(
+                f"You Selected: Above {labels[left_value - 1]} to {labels[right_value - 1]} Followers"
+            )
+        with search_col5:
+            date = st.date_input("Get Contacted lead from date:", value=None)
+            if date:
+                today_date = date.today()
+                days_since_reference_given = (today_date - date).days
+                st.write(
+                    f"Leads Contacted greater than: {days_since_reference_given} days will be included"
+                )
+            else:
+                days_since_reference_given = None
 
         follower_range = []
-
-        st.write(
-            f"You Selected: Above {labels[left_value - 1]} to {labels[right_value - 1]} Followers"
-        )
+     
         follower_range.append(left_value)
         follower_range.append(right_value)
         lead_type_col1, lead_type_col2 = st.columns([1, 1])
@@ -323,7 +285,7 @@ def main():
 
             st.header(header_text)
             data = fetcher.fetch_influencer_data(
-                keywords, bio_keywords, hashtag_keywords, social_platforms
+                keywords, bio_keywords, hashtag_keywords, social_platforms, days_since_reference_given
             )
             st.data_editor(
                 data,
@@ -356,7 +318,7 @@ def main():
         email_data = st.text_input("Check if email exist: paste email here")
 
         if st.button("Check Email"):
-            is_email_exist = check_close_if_email_exist(email_data)
+            is_email_exist = get_close_data(email_data)
 
             if is_email_exist:
                 email_text.text("This email already exist in close")
@@ -484,37 +446,6 @@ def main():
                 st.warning("Please enter a search query.")
         else:
             st.write("Enter a search term and click 'Fetch Data' to proceed.")
-
-
-footer = """<style>
-a:link , a:visited{
-color: blue;
-background-color: transparent;
-text-decoration: underline;
-}
-
-a:hover,  a:active {
-color: red;
-background-color: transparent;
-text-decoration: underline;
-}
-
-.footer {
-position: fixed;
-left: 0;
-bottom: 0;
-width: 100%;
-background-color: white;
-color: black;
-text-align: center;
-}
-</style>
-<div class="footer">
-<p>Disclaimer: This tool is under development and is continuously improving thru collaborations and suggestions feel free to give feedbacks thanks - Harold</p>
-</div>
-"""
-
-st.markdown(footer, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
