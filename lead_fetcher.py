@@ -321,7 +321,7 @@ def main():
             is_email_exist = get_close_data(email_data)
 
             if is_email_exist:
-                email_text.text("This email already exist in close")
+                email_text.text(is_email_exist)
             else:
                 email_text.text("Email does not exist")
     else:
