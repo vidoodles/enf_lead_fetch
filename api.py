@@ -6,7 +6,7 @@ import pytz
 api = Client(st.secrets["close_api_key"])
 
 
-def get_latest_email(lead_id):
+def get_latest_email(lead_id, days_back=0):
     response = api.get(
         "activity/email/",
         params={
@@ -18,11 +18,14 @@ def get_latest_email(lead_id):
     if response["data"]:
         latest_email = response["data"][0]
         utc_dt = datetime.fromisoformat(latest_email.get("date_created"))
+        time_limit = datetime.now(pytz.utc) - timedelta(days=days_back)
         sg_ph_tz = pytz.timezone("Asia/Singapore")
         sg_ph_time = utc_dt.astimezone(sg_ph_tz)
         formatted_date = sg_ph_time.strftime("%Y-%m-%d")
-        return formatted_date
-    
+        if utc_dt <= time_limit:
+            return 'Not Qualified'
+        else:
+            return formatted_date
     return None
 
 def get_close_data(email, days_back=None):
