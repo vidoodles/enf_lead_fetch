@@ -23,9 +23,9 @@ def get_latest_email(lead_id, days_back=0):
         sg_ph_time = utc_dt.astimezone(sg_ph_tz)
         formatted_date = sg_ph_time.strftime("%Y-%m-%d")
         if utc_dt <= time_limit:
-            return 'Recently Contacted'
+            return formatted_date
         else:
-            return f'Contacted Last: {formatted_date}'
+            return formatted_date
     return None
 
 def get_close_data(email, days_back=None):
