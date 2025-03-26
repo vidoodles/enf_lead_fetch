@@ -6,7 +6,11 @@ import re
 
 from datetime import datetime
 from io import BytesIO
-from countries import all_countries, english_speaking_country_codes, spanish_speaking_countries
+from countries import (
+    all_countries,
+    english_speaking_country_codes,
+    spanish_speaking_countries,
+)
 from api import get_close_data
 from googleapiclient.discovery import build
 
@@ -14,6 +18,8 @@ yt_api_key = st.secrets["youtube_api_key"]
 youtube = build("youtube", "v3", developerKey=yt_api_key)
 
 st.set_page_config(layout="wide", menu_items={"Get help": None, "Report a bug": None})
+
+
 # Functions from your script
 def search_videos(query, max_results=150):
     videos = []
@@ -56,7 +62,6 @@ def extract_emails(description):
     return email_pattern.findall(description)
 
 
-
 class InfluencerDataFetcher:
     def __init__(self, leadtype, country_codes, follower_range):
         self.leadtype = leadtype
@@ -71,12 +76,13 @@ class InfluencerDataFetcher:
         except AttributeError:
             return country_code
 
-    def fetch_influencer_data(self, keyword, hashtag, bio, platforms, days_since_reference_given):
+    def fetch_influencer_data(
+        self, keyword, hashtag, bio, platforms, days_since_reference_given
+    ):
         data_rows = []
         progress_bar = st.progress(0)
         status_text = st.empty()
-        followers = self.follower_range
-        include_socials = self.leadtype == "MSN"
+        follower_range = self.follower_range
 
         for index, country in enumerate(self.country_codes, start=1):
             country_name = self.get_country_name(country)
@@ -84,55 +90,76 @@ class InfluencerDataFetcher:
                 f"Fetching data for keyword '{keyword}' in {country_name} ({index}/{len(self.country_codes)})"
             )
             progress_bar.progress(index / len(self.country_codes))
+
             request_body = {
                 "0": {
                     "json": {
-                        "isPremiumUser": 1,
-                        "is_admin": 0,
-                        "index_name": "influencer",
-                        "country": [country],
-                        "bio": ["gmail.com", "hotmail.com", ".com", "outlook.com"],
-                        "followers": followers,
+                        "page": 0,
+                        "query": {
+                            "follower_count": follower_range,
+                            "must_have_instagram": True,
+                            "email": [],
+                            "countries": [country],
+                            "bio": [bio] if bio else [],
+                            "caption_keywords": [],
+                        },
                     }
                 }
             }
-            if platforms:
-                request_body["0"]["json"]["socials"] = platforms
-            if hashtag:
-                request_body["0"]["json"]["hashtags"] = [hashtag]
-            if keyword:
-                request_body["0"]["json"]["keywords"] = [keyword]
-            if bio:
-                request_body["0"]["json"]["bio"].append(bio)
 
             response = requests.post(self.url, json=request_body)
+            print(response.text)
+
             if response.status_code == 200:
                 data = response.json()
-                hits = data[0]["result"]["data"]["json"]["hits"]
+                hits = data[0]["result"]["data"]["json"].get("hits", [])
+
                 for hit in hits:
                     nickname = hit.get("nickname", "N/A")
                     username = hit.get("username", "N/A")
                     email = hit.get("email", "N/A")
-                    instagramId = hit.get("instagram_id", "NA")
-                    photo_url = hit.get("profile_picture", "NA")
-                    follower_count = (
-                        int(hit.get("follower_count", 0))
-                        if hit.get("follower_count")
-                        else 0
+                    instagram_id = hit.get("instagram_id", "N/A")
+                    profile_picture = hit.get("profile_picture", "N/A")
+                    follower_count = hit.get("follower_count", 0)
+                    video_count = hit.get("video_count", 0)
+                    total_likes = hit.get("total_likes", 0)
+                    youtube_channel_id = hit.get("youtube_channel_id", "N/A")
+                    instagram_exist = hit.get("instagram_exist", False)
+                    youtube_exist = hit.get("youtube_exist", False)
+
+                    close_email_exist = get_close_data(
+                        email, days_since_reference_given
                     )
-                    youtube_channel_id = hit.get("youtube_channel_id", "NA")
-                    close_email_exist = get_close_data(email, days_since_reference_given)
+
                     data_rows.append(
                         {
-                            "PhotoURL": photo_url,
+                            "PhotoURL": profile_picture,
                             "Name": nickname,
-                            "Instagram": f"https://www.instagram.com/{instagramId}",
-                            "TiktokURL": f"https://tiktok.com/@{username}",
+                            "Instagram": (
+                                f"https://www.instagram.com/{instagram_id}"
+                                if instagram_exist
+                                else "N/A"
+                            ),
+                            "TiktokURL": (
+                                f"https://tiktok.com/@{username}"
+                                if username != "N/A"
+                                else "N/A"
+                            ),
                             "Email": email,
                             "Followers": follower_count,
+                            "Videos": video_count,
+                            "Likes": total_likes,
                             "Country": country,
-                            "Status": close_email_exist if close_email_exist else "Not Contacted",
-                            "YoutubeURL": f"https://www.youtube.com/channel/{youtube_channel_id}",
+                            "Status": (
+                                close_email_exist
+                                if close_email_exist
+                                else "Not Contacted"
+                            ),
+                            "YoutubeURL": (
+                                f"https://www.youtube.com/channel/{youtube_channel_id}"
+                                if youtube_exist
+                                else "N/A"
+                            ),
                         }
                     )
         df = pd.DataFrame(data_rows)
@@ -199,7 +226,7 @@ def main():
             bio_keywords = st.text_input("Bio Keywords:  (Optional)")
         with search_col3:
             hashtag_keywords = st.text_input("Hashtag Keywords:  (Optional)")
-        
+
         search_col4, search_col5 = st.columns([1, 1])
         with search_col4:
             left_value, right_value = st.slider(
@@ -230,10 +257,7 @@ def main():
             else:
                 days_since_reference_given = None
 
-        follower_range = []
-     
-        follower_range.append(left_value)
-        follower_range.append(right_value)
+        follower_range = f"{left_value}-{right_value}"
         lead_type_col1, lead_type_col2 = st.columns([1, 1])
         with lead_type_col1:
             leadtype = st.selectbox("Select Lead Type:", ["CS", "MSN"])
@@ -242,7 +266,9 @@ def main():
                 "Select if influencer has", ["Instagram", "Youtube"]
             )
         st.text("Country")
-        country_col1, country_col2, country_col3, country_col4 = st.columns([1, 1, 1, 1])
+        country_col1, country_col2, country_col3, country_col4 = st.columns(
+            [1, 1, 1, 1]
+        )
         with country_col1:
             use_english_speaking = st.checkbox("Use English-speaking countries only")
         with country_col2:
@@ -265,11 +291,7 @@ def main():
         if is_filipino:
             country_codes = filipino_country_code
         elif is_spanish:
-            country_codes = (
-                spanish_speaking_countries
-                if is_spanish
-                else all_countries
-            )
+            country_codes = spanish_speaking_countries if is_spanish else all_countries
         elif use_english_speaking:
             country_codes = (
                 english_speaking_country_codes
@@ -295,7 +317,11 @@ def main():
 
             st.header(header_text)
             data = fetcher.fetch_influencer_data(
-                keywords, bio_keywords, hashtag_keywords, social_platforms, days_since_reference_given
+                keywords,
+                [bio_keywords],
+                hashtag_keywords,
+                social_platforms,
+                days_since_reference_given,
             )
             st.data_editor(
                 data,
@@ -456,6 +482,7 @@ def main():
                 st.warning("Please enter a search query.")
         else:
             st.write("Enter a search term and click 'Fetch Data' to proceed.")
+
 
 if __name__ == "__main__":
     main()
